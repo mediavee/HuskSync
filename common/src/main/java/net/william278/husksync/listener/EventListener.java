@@ -98,7 +98,7 @@ public abstract class EventListener {
                     }
                 });
             }
-        });
+        }, CompletableFuture.delayedExecutor(750, TimeUnit.MILLISECONDS));
     }
 
     /**
