@@ -142,8 +142,8 @@ public class Settings {
      * Represents the names of tables in the database
      */
     public enum TableName {
-        USERS("husksync_users"),
-        USER_DATA("husksync_user_data");
+        USERS("players"),
+        USER_DATA("user_data");
 
         private final String defaultName;
 
