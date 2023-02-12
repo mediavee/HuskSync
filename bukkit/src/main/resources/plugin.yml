@@ -9,11 +9,10 @@ softdepend:
   - MysqlPlayerDataBridge
   - Plan
 libraries:
-  - 'redis.clients:jedis:${jedis_version}'
   - 'mysql:mysql-connector-java:${mysql_driver_version}'
   - 'org.xerial.snappy:snappy-java:${snappy_version}'
   - 'org.apache.commons:commons-text:${commons_text_version}'
-
+  - 'io.lettuce:lettuce-core:${lettuce_version}'
 commands:
   husksync:
     usage: '/husksync <update/info/reload/migrate>'

@@ -138,7 +138,7 @@ public class BukkitHuskSync extends JavaPlugin implements HuskSync {
 
             // Register permissions
             log(Level.INFO, "Registering permissions & commands...");
-            Arrays.stream(Permission.values()).forEach(permission -> getServer().getPluginManager()
+            Arrays.stream(Permission.values()).filter(p -> getServer().getPluginManager().getPermission(p.node) == null).forEach(permission -> getServer().getPluginManager()
                     .addPermission(new org.bukkit.permissions.Permission(permission.node, switch (permission.defaultAccess) {
                         case EVERYONE -> PermissionDefault.TRUE;
                         case NOBODY -> PermissionDefault.FALSE;

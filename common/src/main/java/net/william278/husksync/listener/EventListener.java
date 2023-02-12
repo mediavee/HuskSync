@@ -98,8 +98,10 @@ public abstract class EventListener {
                     }
                 });
             }
-        }, CompletableFuture.delayedExecutor(750, TimeUnit.MILLISECONDS));
+        }, CompletableFuture.delayedExecutor(350, TimeUnit.MILLISECONDS));
     }
+
+
 
     /**
      * Set a user's data from the database

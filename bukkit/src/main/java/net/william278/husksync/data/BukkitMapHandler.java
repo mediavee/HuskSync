@@ -15,6 +15,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.awt.*;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Objects;
 import java.util.logging.Level;
 
@@ -50,7 +51,7 @@ public class BukkitMapHandler {
         // Get the map data
         plugin.debug("Rendering map view onto canvas for locked map");
         final LockedMapCanvas canvas = new LockedMapCanvas(mapView);
-        for (MapRenderer renderer : mapView.getRenderers()) {
+        for (MapRenderer renderer : new ArrayList<>(mapView.getRenderers())) {
             renderer.render(mapView, canvas, Bukkit.getServer()
                     .getOnlinePlayers().stream()
                     .findAny()
