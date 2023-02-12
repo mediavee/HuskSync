@@ -6,6 +6,7 @@ import net.william278.husksync.player.OnlineUser;
 import net.william278.husksync.player.User;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
@@ -21,7 +22,7 @@ import java.util.UUID;
  * @param cause            The {@link DataSaveCause} that caused this data to be saved
  */
 public record UserDataSnapshot(@NotNull UUID versionUUID, @NotNull Date versionTimestamp,
-                               @NotNull DataSaveCause cause, boolean pinned,
+                               @NotNull DataSaveCause cause, boolean pinned, @NotNull String originServer,
                                @NotNull UserData userData) implements Comparable<UserDataSnapshot> {
 
     /**
@@ -36,7 +37,11 @@ public record UserDataSnapshot(@NotNull UUID versionUUID, @NotNull Date versionT
      */
     public static UserDataSnapshot create(@NotNull UserData userData) {
         return new UserDataSnapshot(UUID.randomUUID(), new Date(),
-                DataSaveCause.API, false, userData);
+                DataSaveCause.API, false, getServerName(), userData);
+    }
+
+    public static String getServerName() {
+        return new File(System.getProperty("user.dir")).getName();
     }
 
     /**
@@ -54,6 +59,7 @@ public record UserDataSnapshot(@NotNull UUID versionUUID, @NotNull Date versionT
         locales.getLocale("data_manager_timestamp",
                         new SimpleDateFormat("MMM dd yyyy, HH:mm:ss.sss").format(versionTimestamp()))
                 .ifPresent(user::sendMessage);
+        locales.getLocale("data_manager_origin_server", originServer).ifPresent(user::sendMessage);
         if (pinned()) {
             locales.getLocale("data_manager_pinned").ifPresent(user::sendMessage);
         }

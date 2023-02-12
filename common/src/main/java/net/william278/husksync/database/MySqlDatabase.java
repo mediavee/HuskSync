@@ -9,6 +9,7 @@ import net.william278.husksync.player.User;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.sql.*;
 import java.util.Date;
@@ -73,6 +74,10 @@ public class MySqlDatabase extends Database {
      */
     private Connection getConnection() throws SQLException {
         return connectionPool.getConnection();
+    }
+
+    public String getServerName() {
+        return new File(System.getProperty("user.dir")).getName();
     }
 
     @Override
@@ -205,7 +210,7 @@ public class MySqlDatabase extends Database {
         return CompletableFuture.supplyAsync(() -> {
             try (Connection connection = getConnection()) {
                 try (PreparedStatement statement = connection.prepareStatement(formatStatementTables("""
-                        SELECT `version_uuid`, `timestamp`, `save_cause`, `pinned`, `data`
+                        SELECT `version_uuid`, `timestamp`, `save_cause`, `pinned`, `data`, `origin_server`
                         FROM `%user_data_table%`
                         WHERE `player_uuid`=?
                         ORDER BY `timestamp` DESC
@@ -221,6 +226,7 @@ public class MySqlDatabase extends Database {
                                 Date.from(resultSet.getTimestamp("timestamp").toInstant()),
                                 DataSaveCause.getCauseByName(resultSet.getString("save_cause")),
                                 resultSet.getBoolean("pinned"),
+                                resultSet.getString("origin_server"),
                                 plugin.getDataAdapter().fromBytes(dataByteArray)));
                     }
                 }
@@ -237,7 +243,7 @@ public class MySqlDatabase extends Database {
             final List<UserDataSnapshot> retrievedData = new ArrayList<>();
             try (Connection connection = getConnection()) {
                 try (PreparedStatement statement = connection.prepareStatement(formatStatementTables("""
-                        SELECT `version_uuid`, `timestamp`, `save_cause`, `pinned`, `data`
+                        SELECT `version_uuid`, `timestamp`, `save_cause`, `pinned`, `data`, `origin_server`
                         FROM `%user_data_table%`
                         WHERE `player_uuid`=?
                         ORDER BY `timestamp` DESC;"""))) {
@@ -252,6 +258,7 @@ public class MySqlDatabase extends Database {
                                 Date.from(resultSet.getTimestamp("timestamp").toInstant()),
                                 DataSaveCause.getCauseByName(resultSet.getString("save_cause")),
                                 resultSet.getBoolean("pinned"),
+                                resultSet.getString("origin_server"),
                                 plugin.getDataAdapter().fromBytes(dataByteArray));
                         retrievedData.add(data);
                     }
@@ -269,7 +276,7 @@ public class MySqlDatabase extends Database {
         return CompletableFuture.supplyAsync(() -> {
             try (Connection connection = getConnection()) {
                 try (PreparedStatement statement = connection.prepareStatement(formatStatementTables("""
-                        SELECT `version_uuid`, `timestamp`, `save_cause`, `pinned`, `data`
+                        SELECT `version_uuid`, `timestamp`, `save_cause`, `pinned`, `data`, `origin_server`
                         FROM `%user_data_table%`
                         WHERE `player_uuid`=? AND `version_uuid`=?
                         ORDER BY `timestamp` DESC
@@ -286,6 +293,7 @@ public class MySqlDatabase extends Database {
                                 Date.from(resultSet.getTimestamp("timestamp").toInstant()),
                                 DataSaveCause.getCauseByName(resultSet.getString("save_cause")),
                                 resultSet.getBoolean("pinned"),
+                                resultSet.getString("origin_server"),
                                 plugin.getDataAdapter().fromBytes(dataByteArray)));
                     }
                 }
@@ -350,12 +358,13 @@ public class MySqlDatabase extends Database {
                 try (Connection connection = getConnection()) {
                     try (PreparedStatement statement = connection.prepareStatement(formatStatementTables("""
                             INSERT INTO `%user_data_table%`
-                            (`player_uuid`,`version_uuid`,`timestamp`,`save_cause`,`data`)
-                            VALUES (?,UUID(),NOW(),?,?);"""))) {
+                            (`player_uuid`,`version_uuid`,`timestamp`,`save_cause`,`data`, `origin_server`)
+                            VALUES (?,UUID(),NOW(),?,?,?);"""))) {
                         statement.setString(1, user.uuid.toString());
                         statement.setString(2, saveCause.name());
                         statement.setBlob(3, new ByteArrayInputStream(
                                 plugin.getDataAdapter().toBytes(finalData)));
+                        statement.setString(4, getServerName());
                         statement.executeUpdate();
                     }
                 } catch (SQLException | DataAdaptionException e) {
