@@ -6,6 +6,7 @@ import net.william278.husksync.config.Settings;
 import net.william278.husksync.data.*;
 import net.william278.husksync.event.DataSaveEvent;
 import net.william278.husksync.player.User;
+import net.william278.husksync.util.NamedThreadPoolFactory;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.ByteArrayInputStream;
@@ -15,6 +16,7 @@ import java.sql.*;
 import java.util.Date;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 import java.util.logging.Level;
 
 public class MySqlDatabase extends Database {
@@ -50,6 +52,8 @@ public class MySqlDatabase extends Database {
      */
     private HikariDataSource connectionPool;
 
+    private final ExecutorService executor;
+
     public MySqlDatabase(@NotNull HuskSync plugin) {
         super(plugin);
         final Settings settings = plugin.getSettings();
@@ -64,6 +68,8 @@ public class MySqlDatabase extends Database {
         this.hikariMaximumLifetime = settings.mySqlConnectionPoolLifetime;
         this.hikariKeepAliveTime = settings.mySqlConnectionPoolKeepAlive;
         this.hikariConnectionTimeOut = settings.mySqlConnectionPoolTimeout;
+
+        this.executor = NamedThreadPoolFactory.newThreadPool("HuskSync-MySQL", 6);
     }
 
     /**
@@ -179,7 +185,7 @@ public class MySqlDatabase extends Database {
                 plugin.log(Level.SEVERE, "Failed to fetch a user from uuid from the database", e);
             }
             return Optional.empty();
-        });
+        }, executor);
     }
 
     @Override
@@ -202,7 +208,7 @@ public class MySqlDatabase extends Database {
                 plugin.log(Level.SEVERE, "Failed to fetch a user by name from the database", e);
             }
             return Optional.empty();
-        });
+        }, executor);
     }
 
     @Override
@@ -234,7 +240,7 @@ public class MySqlDatabase extends Database {
                 plugin.log(Level.SEVERE, "Failed to fetch a user's current user data from the database", e);
             }
             return Optional.empty();
-        });
+        }, executor);
     }
 
     @Override
@@ -268,7 +274,7 @@ public class MySqlDatabase extends Database {
                 plugin.log(Level.SEVERE, "Failed to fetch a user's current user data from the database", e);
             }
             return retrievedData;
-        });
+        }, executor);
     }
 
     @Override
@@ -301,7 +307,7 @@ public class MySqlDatabase extends Database {
                 plugin.log(Level.SEVERE, "Failed to fetch specific user data by UUID from the database", e);
             }
             return Optional.empty();
-        });
+        }, executor);
     }
 
     @Override
@@ -325,7 +331,7 @@ public class MySqlDatabase extends Database {
                     plugin.log(Level.SEVERE, "Failed to prune user data from the database", e);
                 }
             }
-        });
+        }, executor);
     }
 
     @Override
@@ -344,7 +350,7 @@ public class MySqlDatabase extends Database {
                 plugin.log(Level.SEVERE, "Failed to delete specific user data from the database", e);
             }
             return false;
-        });
+        }, executor);
     }
 
     @Override
@@ -371,7 +377,7 @@ public class MySqlDatabase extends Database {
                     plugin.log(Level.SEVERE, "Failed to set user data in the database", e);
                 }
             }
-        }).thenRun(() -> rotateUserData(user).join());
+        }, executor).thenRun(() -> rotateUserData(user).join());
     }
 
     @Override
@@ -390,7 +396,7 @@ public class MySqlDatabase extends Database {
             } catch (SQLException e) {
                 plugin.log(Level.SEVERE, "Failed to pin user data in the database", e);
             }
-        });
+        }, executor);
     }
 
     @Override
@@ -409,7 +415,7 @@ public class MySqlDatabase extends Database {
             } catch (SQLException e) {
                 plugin.log(Level.SEVERE, "Failed to unpin user data in the database", e);
             }
-        });
+        }, executor);
     }
 
     @Override
@@ -422,7 +428,7 @@ public class MySqlDatabase extends Database {
             } catch (SQLException e) {
                 plugin.log(Level.SEVERE, "Failed to wipe the database", e);
             }
-        });
+        }, executor);
     }
 
     @Override

@@ -18,6 +18,7 @@ dependencies {
 //    compileOnly 'redis.clients:jedis:4.4.0-m2'
     compileOnly 'org.xerial.snappy:snappy-java:' + snappy_version
     compileOnly 'org.apache.commons:commons-text:' + commons_text_version
+    compileOnly 'com.google.guava:guava:11.0.2'
 
     testImplementation 'org.xerial.snappy:snappy-java:1.1.8.4'
     testImplementation 'com.github.plan-player-analytics:Plan:5.4.1690'
