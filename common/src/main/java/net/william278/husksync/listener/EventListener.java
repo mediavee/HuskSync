@@ -39,25 +39,42 @@ public abstract class EventListener {
      */
     private boolean disabling;
 
-    private final ForkJoinPool executor;
+    public static ForkJoinPool executor;
 
-    protected EventListener(@NotNull HuskSync plugin) {
-        this.plugin = plugin;
-        this.lockedPlayers = new HashSet<>();
-        this.disabling = false;
+    static {
+        RuntimeException ex = new RuntimeException();
+        StackTraceElement[] stackTrace = ex.getStackTrace();
+        if (stackTrace.length > 0) {
+            StackTraceElement element = stackTrace[0];
+            Throwable throwable = new Throwable();
+            throwable.setStackTrace(new StackTraceElement[]{element});
+            throwable.printStackTrace();
+        }
 
         ForkJoinPool.ForkJoinWorkerThreadFactory factory = pool -> {
             final ForkJoinWorkerThread worker = ForkJoinPool.defaultForkJoinWorkerThreadFactory.newThread(pool);
             worker.setName("HuskSync-EventListener-" + worker.getPoolIndex());
             return worker;
         };
-
-        this.executor = new ForkJoinPool(
+        executor = new ForkJoinPool(
                 8,
                 factory,
                 null,
-                true
+                true,
+                0,
+                8,
+                0,
+                null,
+                60_000L,
+                TimeUnit.MILLISECONDS
         );
+    }
+
+    protected EventListener(@NotNull HuskSync plugin) {
+
+        this.plugin = plugin;
+        this.lockedPlayers = new HashSet<>();
+        this.disabling = false;
     }
 
     /**
@@ -158,27 +175,41 @@ public abstract class EventListener {
      */
     protected final void handlePlayerQuit(@NotNull OnlineUser user) {
         // Players quitting have their data manually saved by the plugin disable hook
+        System.out.println("handlePlayerQuit");
         if (disabling) {
             return;
         }
         // Don't sync players awaiting synchronization
+        System.out.println("check if player is locked");
         if (lockedPlayers.contains(user.uuid) || user.isNpc()) {
             return;
         }
 
         // Handle asynchronous disconnection
+        System.out.println("handle async disconnection");
         lockedPlayers.add(user.uuid);
         plugin.getRedisManager().setUserServerSwitch(user)
-                .thenRun(() -> user.getUserData(plugin).thenAccept(
-                        optionalUserData -> optionalUserData.ifPresent(userData -> plugin.getRedisManager()
-                                .setUserData(user, userData).thenRun(() -> plugin.getDatabase()
-                                        .setUserData(user, userData, DataSaveCause.DISCONNECT)))))
+                .thenRun(() -> {
+                    System.out.println("set user server switch");
+                    user.getUserData(plugin).thenAccept(userData -> {
+                        System.out.println("get user data");
+                        userData.ifPresent(userDataGetted -> {
+                            System.out.println("set user data");
+                            plugin.getRedisManager().setUserData(user, userDataGetted).thenRun(() -> {
+                                System.out.println("set user data in redis");
+                                plugin.getDatabase().setUserData(user, userDataGetted, DataSaveCause.DISCONNECT);
+                                System.out.println("set user data in database");
+                            });
+                        });
+                    });
+                })
                 .exceptionally(throwable -> {
                     plugin.log(Level.SEVERE,
                             "An exception occurred handling a player disconnection");
                     throwable.printStackTrace();
                     return null;
                 });
+        System.out.println("end of handlePlayerQuit");
     }
 
     /**

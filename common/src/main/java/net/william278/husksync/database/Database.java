@@ -16,6 +16,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ForkJoinPool;
 
 /**
  * An abstract representation of the plugin database, storing player data.
@@ -114,10 +115,9 @@ public abstract class Database {
      * <b>(Internal)</b> Prune user data for a given user to the maximum value as configured.
      *
      * @param user The user to prune data for
-     * @return A future returning void when complete
      * @implNote Data snapshots marked as {@code pinned} are exempt from rotation
      */
-    protected abstract CompletableFuture<Void> rotateUserData(@NotNull User user);
+    protected abstract void rotateUserData(@NotNull User user);
 
     /**
      * Deletes a specific {@link UserDataSnapshot} entry for a user from the database, by its UUID.
@@ -172,5 +172,7 @@ public abstract class Database {
      * Close the database connection
      */
     public abstract void close();
+
+    public abstract ForkJoinPool getForkJoinPool();
 
 }

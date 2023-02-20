@@ -176,6 +176,14 @@ public class BukkitEventListener extends EventListener implements BukkitJoinEven
                     this.getExecutor().getQueuedSubmissionCount(),
                     this.getExecutor().getPoolSize(),
                     this.getExecutor().getParallelism()));
+        } else if (event.getMessage().equals("debubhusksyncdbpool")) {
+            event.getPlayer().sendMessage(String.format("Active threads : %s\nRunning threads : %s\nQueued Task Count : %s\nQueued Submission Count : %s\nPool Size : %s\nParallelism : %s", this.plugin.getDatabase().getForkJoinPool().getActiveThreadCount(),
+                    this.plugin.getDatabase().getForkJoinPool().getRunningThreadCount(),
+                    this.plugin.getDatabase().getForkJoinPool().getQueuedTaskCount(),
+                    this.plugin.getDatabase().getForkJoinPool().getQueuedSubmissionCount(),
+                    this.plugin.getDatabase().getForkJoinPool().getPoolSize(),
+                    this.plugin.getDatabase().getForkJoinPool().getParallelism()));
+
         }
     }
 }
