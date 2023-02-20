@@ -191,7 +191,7 @@ public class BukkitPlayer extends OnlineUser {
     @Override
     public CompletableFuture<Void> setPotionEffects(@NotNull PotionEffectData potionEffectData) {
         return BukkitSerializer.deserializePotionEffectArray(potionEffectData.serializedPotionEffects)
-                .thenApplyAsync(effects -> {
+                .thenApply(effects -> {
                     final CompletableFuture<Void> potionEffectsSetFuture = new CompletableFuture<>();
                     Bukkit.getScheduler().runTask(BukkitHuskSync.getInstance(), () -> {
                         for (PotionEffect effect : player.getActivePotionEffects()) {
