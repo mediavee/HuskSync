@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
 /**
@@ -294,15 +295,15 @@ public abstract class OnlineUser extends User {
                 }
             }};
             // Apply operations in parallel, join when complete
-            return CompletableFuture.allOf(dataSetOperations.toArray(new CompletableFuture[0])).thenApply(unused -> true)
-                    .exceptionally(exception -> {
-                        // Handle synchronisation exceptions
-                        plugin.log(Level.SEVERE, "Failed to set data for player " + username + " (" + exception.getMessage() + ")");
-                        exception.printStackTrace();
-                        return false;
-                    }).join();
+            try {
+                return CompletableFuture.allOf(dataSetOperations.toArray(new CompletableFuture[0])).thenApply(unused -> true)
+                        .get(3, TimeUnit.SECONDS);
+            } catch (Exception ex) {
+                plugin.log(Level.SEVERE, "Failed to set data for player " + username + " (" + ex.getMessage() + ")");
+                ex.printStackTrace();
+                return false;
+            }
         });
-
     }
 
     /**
