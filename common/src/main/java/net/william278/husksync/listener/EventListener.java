@@ -11,10 +11,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 
@@ -135,13 +132,14 @@ public abstract class EventListener {
                         .ifPresent(locale -> user.sendToast(locale, new MineDown(""),
                                 "minecraft:bell", "TASK"));
             }
-            plugin.getDatabase().ensureUser(user).join();
-            lockedPlayers.remove(user.uuid);
-            plugin.getEventCannon().fireSyncCompleteEvent(user);
+            plugin.getDatabase().ensureUser(user).thenRun(() -> {
+                plugin.getEventCannon().fireSyncCompleteEvent(user);
+                lockedPlayers.remove(user.uuid);
+            });
         } else {
             plugin.getLocales().getLocale("synchronisation_failed")
                     .ifPresent(user::sendMessage);
-            plugin.getDatabase().ensureUser(user).join();
+            plugin.getDatabase().ensureUser(user);
         }
     }
 
