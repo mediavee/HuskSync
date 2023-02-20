@@ -53,7 +53,7 @@ public class RedisManager {
             client = RedisClient.create("redis://" + redisPassword + "@" + redisHost + ":" + redisPort);
         }
         redisImpl = new RedisImpl(client);
-        CompletableFuture.runAsync(this::subscribe);
+        subscribe();
         return true;
     }
 

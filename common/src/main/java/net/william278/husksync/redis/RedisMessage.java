@@ -5,7 +5,6 @@ import com.google.gson.JsonSyntaxException;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
 public class RedisMessage {
 
@@ -21,8 +20,8 @@ public class RedisMessage {
     }
 
     public void dispatch(@NotNull RedisManager redisManager, @NotNull RedisMessageType type) {
-        CompletableFuture.runAsync(() -> redisManager.sendMessage(type.getMessageChannel(),
-                new GsonBuilder().create().toJson(this)));
+        redisManager.sendMessage(type.getMessageChannel(),
+                new GsonBuilder().create().toJson(this));
     }
 
     @NotNull
