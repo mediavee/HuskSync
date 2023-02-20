@@ -1,5 +1,6 @@
 package net.william278.husksync.listener;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import de.themoep.minedown.adventure.MineDown;
 import net.william278.husksync.HuskSync;
 import net.william278.husksync.data.DataSaveCause;
@@ -45,7 +46,18 @@ public abstract class EventListener {
         this.lockedPlayers = new HashSet<>();
         this.disabling = false;
 
-        this.executor = NamedThreadPoolFactory.newThreadPool("HuskSync-EventListener", 8);
+        ForkJoinPool.ForkJoinWorkerThreadFactory factory = pool -> {
+            final ForkJoinWorkerThread worker = ForkJoinPool.defaultForkJoinWorkerThreadFactory.newThread(pool);
+            worker.setName("HuskSync-EventListener-" + worker.getPoolIndex());
+            return worker;
+        };
+
+        this.executor = new ForkJoinPool(
+                8,
+                factory,
+                null,
+                true
+        );
     }
 
     /**
