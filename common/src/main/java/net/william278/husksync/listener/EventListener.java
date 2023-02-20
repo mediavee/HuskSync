@@ -41,6 +41,7 @@ public abstract class EventListener {
 
     public static ForkJoinPool executor;
 
+    /**
     static {
         RuntimeException ex = new RuntimeException();
         StackTraceElement[] stackTrace = ex.getStackTrace();
@@ -50,6 +51,14 @@ public abstract class EventListener {
             throwable.setStackTrace(new StackTraceElement[]{element});
             throwable.printStackTrace();
         }
+
+
+    } */
+
+    protected EventListener(@NotNull HuskSync plugin) {
+        this.plugin = plugin;
+        this.lockedPlayers = new HashSet<>();
+        this.disabling = false;
 
         ForkJoinPool.ForkJoinWorkerThreadFactory factory = pool -> {
             final ForkJoinWorkerThread worker = ForkJoinPool.defaultForkJoinWorkerThreadFactory.newThread(pool);
@@ -68,13 +77,6 @@ public abstract class EventListener {
                 60_000L,
                 TimeUnit.MILLISECONDS
         );
-    }
-
-    protected EventListener(@NotNull HuskSync plugin) {
-
-        this.plugin = plugin;
-        this.lockedPlayers = new HashSet<>();
-        this.disabling = false;
     }
 
     /**
