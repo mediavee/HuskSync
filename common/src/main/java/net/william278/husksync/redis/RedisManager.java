@@ -122,38 +122,28 @@ public class RedisManager {
      * @return a future returning void when complete
      */
     public CompletableFuture<Void> setUserData(@NotNull User user, @NotNull UserData userData) {
-        try {
-            return CompletableFuture.runAsync(() -> {
-
-                // Set the user's data as a compressed byte array of the json using Snappy
-
-                redisImpl.getBinaryConnectionAsync(connection ->
+        return redisImpl.getBinaryConnectionAsync(connection ->
                         connection.setex(RedisKeyType.DATA_UPDATE.getKeyPrefix() + ":" + user.uuid,
                                 RedisKeyType.DATA_UPDATE.timeToLive,
-                                plugin.getDataAdapter().toBytes(userData)));
-
-                plugin.debug("[" + user.username + "] Set " + RedisKeyType.DATA_UPDATE.name()
-                        + " key to redis at: " +
-                        new SimpleDateFormat("mm:ss.SSS").format(new Date()));
-
-            });
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return null;
+                                plugin.getDataAdapter().toBytes(userData)))
+                .toCompletableFuture()
+                .thenAccept(s ->
+                        plugin.debug("[" + user.username + "] Set " + RedisKeyType.DATA_UPDATE.name()
+                                + " key to redis at: " +
+                                new SimpleDateFormat("mm:ss.SSS").format(new Date()))
+                );
     }
 
     public CompletableFuture<Void> setUserServerSwitch(@NotNull User user) {
-        return CompletableFuture.runAsync(() -> {
-
-            redisImpl.getBinaryConnectionAsync(connection ->
-                    connection.setex(RedisKeyType.SERVER_SWITCH.getKeyPrefix() + ":" + user.uuid,
-                            RedisKeyType.SERVER_SWITCH.timeToLive, new byte[0]));
-
-            plugin.debug("[" + user.username + "] Set " + RedisKeyType.SERVER_SWITCH.name()
-                    + " key to redis at: " +
-                    new SimpleDateFormat("mm:ss.SSS").format(new Date()));
-        });
+        return redisImpl.getBinaryConnectionAsync(connection ->
+                        connection.setex(RedisKeyType.SERVER_SWITCH.getKeyPrefix() + ":" + user.uuid,
+                                RedisKeyType.SERVER_SWITCH.timeToLive, new byte[0]))
+                .toCompletableFuture()
+                .thenAccept(s ->
+                    plugin.debug("[" + user.username + "] Set " + RedisKeyType.SERVER_SWITCH.name()
+                            + " key to redis at: " +
+                            new SimpleDateFormat("mm:ss.SSS").format(new Date()))
+                );
     }
 
     /**
@@ -163,72 +153,48 @@ public class RedisManager {
      * @return The user's data, if it's present on the database. Otherwise, an empty optional.
      */
     public CompletableFuture<Optional<UserData>> getUserData(@NotNull User user) {
+        final String key = RedisKeyType.DATA_UPDATE.getKeyPrefix() + ":" + user.uuid;
 
-        CompletableFuture<Optional<UserData>> future = new CompletableFuture<>();
+        return redisImpl.getBinaryConnectionAsync(connection -> connection.getdel(key))
+                .toCompletableFuture()
+                .thenApply(bytes -> ((byte[]) bytes))
+                .thenApply(dataByteArray -> {
+                    if (dataByteArray == null) {
+                        plugin.debug("[" + user.username + "] Could not read " +
+                                RedisKeyType.DATA_UPDATE.name() + " key from redis at: " +
+                                new SimpleDateFormat("mm:ss.SSS").format(new Date()));
+                        return Optional.empty();
+                    }
+                    plugin.debug("[" + user.username + "] Successfully read "
+                            + RedisKeyType.DATA_UPDATE.name() + " key from redis at: " +
+                            new SimpleDateFormat("mm:ss.SSS").format(new Date()));
 
-        CompletableFuture.runAsync(() ->
-                redisImpl.getBinaryConnection(connection -> {
-                    final String key = RedisKeyType.DATA_UPDATE.getKeyPrefix() + ":" + user.uuid;
+                    // Use the data adapter to convert the byte array to a UserData object
 
-                    return connection.get(key)
-                            .thenApply(bytes -> ((byte[]) bytes))
-                            .thenAccept(dataByteArray -> {
-
-                                if (dataByteArray == null) {
-                                    plugin.debug("[" + user.username + "] Could not read " +
-                                            RedisKeyType.DATA_UPDATE.name() + " key from redis at: " +
-                                            new SimpleDateFormat("mm:ss.SSS").format(new Date()));
-                                    future.complete(Optional.empty());
-                                    return;
-                                }
-                                plugin.debug("[" + user.username + "] Successfully read "
-                                        + RedisKeyType.DATA_UPDATE.name() + " key from redis at: " +
-                                        new SimpleDateFormat("mm:ss.SSS").format(new Date()));
-
-                                // Use the data adapter to convert the byte array to a UserData object
-
-                                final UserData userData = plugin.getDataAdapter().fromBytes(dataByteArray);
-                                future.complete(Optional.of(userData));
-
-                                // Consume the key (delete from redis)
-                                connection.del(key);
-                            });
-                }));
-
-        return future;
+                    final UserData userData = plugin.getDataAdapter().fromBytes(dataByteArray);
+                    return Optional.of(userData);
+                });
     }
 
     public CompletableFuture<Boolean> getUserServerSwitch(@NotNull User user) {
+        final String key = getKey(RedisKeyType.SERVER_SWITCH, user.uuid);
 
-        CompletableFuture<Boolean> future = new CompletableFuture<>();
+        return redisImpl.getBinaryConnection(connection -> connection.getdel(key))
+                .toCompletableFuture()
+                .thenApply(bytes -> ((byte[]) bytes))
+                .thenApply(dataByteArray -> {
+                    if (dataByteArray == null) {
+                        plugin.debug("[" + user.username + "] Could not read " +
+                                RedisKeyType.SERVER_SWITCH.name() + " key from redis at: " +
+                                new SimpleDateFormat("mm:ss.SSS").format(new Date()));
+                        return false;
+                    }
+                    plugin.debug("[" + user.username + "] Successfully read "
+                            + RedisKeyType.SERVER_SWITCH.name() + " key from redis at: " +
+                            new SimpleDateFormat("mm:ss.SSS").format(new Date()));
 
-        CompletableFuture.runAsync(() ->
-                redisImpl.getBinaryConnection(connection -> {
-                    final String key = getKey(RedisKeyType.SERVER_SWITCH, user.uuid);
-
-                    return connection.get(key)
-                            .thenApply(bytes -> ((byte[]) bytes))
-                            .thenAccept(dataByteArray -> {
-
-                                if (dataByteArray == null) {
-                                    plugin.debug("[" + user.username + "] Could not read " +
-                                            RedisKeyType.SERVER_SWITCH.name() + " key from redis at: " +
-                                            new SimpleDateFormat("mm:ss.SSS").format(new Date()));
-                                    future.complete(false);
-                                    return;
-                                }
-                                plugin.debug("[" + user.username + "] Successfully read "
-                                        + RedisKeyType.SERVER_SWITCH.name() + " key from redis at: " +
-                                        new SimpleDateFormat("mm:ss.SSS").format(new Date()));
-
-                                future.complete(true);
-
-                                // Consume the key (delete from redis)
-                                connection.del(key);
-                            });
-                }));
-
-        return future;
+                    return true;
+                });
     }
 
     public void close() {
