@@ -265,7 +265,7 @@ public class BukkitHuskSync extends JavaPlugin implements HuskSync {
 
     @Override
     public void log(@NotNull Level level, @NotNull String message, @NotNull Throwable... throwable) {
-        getLogger().log(level, message, throwable);
+        getLogger().log(level, message, Arrays.stream(throwable).map(t -> t.getStackTrace()).toArray());
     }
 
     @NotNull
