@@ -92,7 +92,7 @@ public abstract class BaseHuskSyncAPI {
     public final CompletableFuture<Void> setUserData(@NotNull User user, @NotNull UserData userData) {
         return CompletableFuture.runAsync(() ->
                 plugin.getDatabase().setUserData(user, userData, DataSaveCause.API)
-                        .thenRun(() -> plugin.getRedisManager().sendUserDataUpdate(user, userData).join()));
+                        .thenRun(() -> plugin.getRedisManager().sendUserDataUpdate(user, userData)));
     }
 
     /**
