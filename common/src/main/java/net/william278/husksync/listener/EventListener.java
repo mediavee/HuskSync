@@ -5,6 +5,7 @@ import net.william278.husksync.HuskSync;
 import net.william278.husksync.data.DataSaveCause;
 import net.william278.husksync.data.ItemData;
 import net.william278.husksync.player.OnlineUser;
+import net.william278.husksync.util.NamedThreadPoolFactory;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashSet;
@@ -37,10 +38,14 @@ public abstract class EventListener {
      */
     private boolean disabling;
 
+    private final Executor executor;
+
     protected EventListener(@NotNull HuskSync plugin) {
         this.plugin = plugin;
         this.lockedPlayers = new HashSet<>();
         this.disabling = false;
+
+        this.executor = NamedThreadPoolFactory.newThreadPool("HuskSync-EventListener", 8);
     }
 
     /**
@@ -55,47 +60,38 @@ public abstract class EventListener {
 
         lockedPlayers.add(user.uuid);
         CompletableFuture.runAsync(() -> {
-            try {
-                // Hold reading data for the network latency threshold, to ensure the source server has set the redis key
-                Thread.sleep(Math.max(0, plugin.getSettings().networkLatencyMilliseconds));
-            } catch (InterruptedException e) {
-                plugin.log(Level.SEVERE, "An exception occurred handling a player join", e);
-            } finally {
-                plugin.getRedisManager().getUserServerSwitch(user).thenAccept(changingServers -> {
-                    if (!changingServers) {
-                        // Fetch from the database if the user isn't changing servers
-                        setUserFromDatabase(user).thenAccept(succeeded -> handleSynchronisationCompletion(user, succeeded));
-                    } else {
-                        final int TIME_OUT_MILLISECONDS = 3200;
-                        CompletableFuture.runAsync(() -> {
-                            final AtomicInteger currentMilliseconds = new AtomicInteger(0);
-                            final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
+            plugin.getRedisManager().getUserServerSwitch(user).thenAccept(changingServers -> {
+                if (!changingServers) {
+                    // Fetch from the database if the user isn't changing servers
+                    setUserFromDatabase(user)
+                            .thenAccept(succeeded -> handleSynchronisationCompletion(user, succeeded));
+                } else {
+                    final int TIME_OUT_MILLISECONDS = 3200;
+                    final AtomicInteger currentMilliseconds = new AtomicInteger(0);
+                    final ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
 
-                            // Set the user as soon as the source server has set the data to redis
-                            executor.scheduleAtFixedRate(() -> {
-                                if (user.isOffline()) {
-                                    executor.shutdown();
-                                    return;
-                                }
-                                if (disabling || currentMilliseconds.get() > TIME_OUT_MILLISECONDS) {
-                                    executor.shutdown();
-                                    setUserFromDatabase(user).thenAccept(
-                                            succeeded -> handleSynchronisationCompletion(user, succeeded));
-                                    return;
-                                }
-                                plugin.getRedisManager().getUserData(user).thenAccept(redisUserData ->
-                                        redisUserData.ifPresent(redisData -> {
-                                            user.setData(redisData, plugin)
-                                                    .thenAccept(succeeded -> handleSynchronisationCompletion(user, succeeded)).join();
-                                            executor.shutdown();
-                                        })).join();
-                                currentMilliseconds.addAndGet(200);
-                            }, 0, 200L, TimeUnit.MILLISECONDS);
-                        });
-                    }
-                });
-            }
-        }, CompletableFuture.delayedExecutor(350, TimeUnit.MILLISECONDS));
+                    // Set the user as soon as the source server has set the data to redis
+                    scheduledExecutor.scheduleAtFixedRate(() -> {
+                        if (user.isOffline()) {
+                            scheduledExecutor.shutdown();
+                            return;
+                        }
+                        if (disabling || currentMilliseconds.get() > TIME_OUT_MILLISECONDS) {
+                            scheduledExecutor.shutdown();
+                            setUserFromDatabase(user)
+                                    .thenAccept(succeeded -> handleSynchronisationCompletion(user, succeeded));
+                            return;
+                        }
+                        plugin.getRedisManager().getUserData(user).thenAccept(redisUserData ->
+                                redisUserData.ifPresent(redisData -> {
+                                    user.setData(redisData, plugin)
+                                            .thenAccept(succeeded -> handleSynchronisationCompletion(user, succeeded));
+                                    scheduledExecutor.shutdown();
+                                })).thenRun(() -> currentMilliseconds.addAndGet(200));
+                    }, 0, 200L, TimeUnit.MILLISECONDS);
+                }
+            });
+        }, CompletableFuture.delayedExecutor(plugin.getSettings().networkLatencyMilliseconds, TimeUnit.MILLISECONDS, executor));
     }
 
 
@@ -160,7 +156,7 @@ public abstract class EventListener {
 
         // Handle asynchronous disconnection
         lockedPlayers.add(user.uuid);
-        CompletableFuture.runAsync(() -> plugin.getRedisManager().setUserServerSwitch(user)
+        plugin.getRedisManager().setUserServerSwitch(user)
                 .thenRun(() -> user.getUserData(plugin).thenAccept(
                         optionalUserData -> optionalUserData.ifPresent(userData -> plugin.getRedisManager()
                                 .setUserData(user, userData).thenRun(() -> plugin.getDatabase()
@@ -170,7 +166,7 @@ public abstract class EventListener {
                             "An exception occurred handling a player disconnection");
                     throwable.printStackTrace();
                     return null;
-                }).join());
+                });
     }
 
     /**
