@@ -107,11 +107,9 @@ public class RedisManager {
         redisImpl.getConnectionAsync(connection -> connection.publish(channel, message));
     }
 
-    public CompletableFuture<Void> sendUserDataUpdate(@NotNull User user, @NotNull UserData userData) {
-        return CompletableFuture.runAsync(() -> {
-            final RedisMessage redisMessage = new RedisMessage(user.uuid, plugin.getDataAdapter().toBytes(userData));
-            redisMessage.dispatch(this, RedisMessageType.UPDATE_USER_DATA);
-        });
+    public void sendUserDataUpdate(@NotNull User user, @NotNull UserData userData) {
+        final RedisMessage redisMessage = new RedisMessage(user.uuid, plugin.getDataAdapter().toBytes(userData));
+        redisMessage.dispatch(this, RedisMessageType.UPDATE_USER_DATA);
     }
 
     /**
@@ -140,9 +138,9 @@ public class RedisManager {
                                 RedisKeyType.SERVER_SWITCH.timeToLive, new byte[0]))
                 .toCompletableFuture()
                 .thenAccept(s ->
-                    plugin.debug("[" + user.username + "] Set " + RedisKeyType.SERVER_SWITCH.name()
-                            + " key to redis at: " +
-                            new SimpleDateFormat("mm:ss.SSS").format(new Date()))
+                        plugin.debug("[" + user.username + "] Set " + RedisKeyType.SERVER_SWITCH.name()
+                                + " key to redis at: " +
+                                new SimpleDateFormat("mm:ss.SSS").format(new Date()))
                 );
     }
 
