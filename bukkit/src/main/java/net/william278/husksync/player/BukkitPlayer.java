@@ -57,9 +57,9 @@ public class BukkitPlayer extends OnlineUser {
 
     @Override
     public CompletableFuture<StatusData> getStatus() {
-        return CompletableFuture.supplyAsync(() -> {
-            final double maxHealth = getMaxHealth(player);
-            return new StatusData(Math.min(player.getHealth(), maxHealth),
+        final double maxHealth = getMaxHealth(player);
+        return CompletableFuture.completedFuture(
+            new StatusData(Math.min(player.getHealth(), maxHealth),
                     maxHealth,
                     player.isHealthScaled() ? player.getHealthScale() : 0d,
                     player.getFoodLevel(),
@@ -70,8 +70,8 @@ public class BukkitPlayer extends OnlineUser {
                     player.getLevel(),
                     player.getExp(),
                     player.getGameMode().name(),
-                    player.getAllowFlight() && player.isFlying());
-        });
+                    player.getAllowFlight() && player.isFlying())
+        );
     }
 
     @Override
