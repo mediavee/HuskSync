@@ -1,5 +1,5 @@
 name: HuskSync
-version: ${version}
+version: ${version}-topeestla
 main: net.william278.husksync.BukkitHuskSync
 api-version: 1.16
 author: William278
