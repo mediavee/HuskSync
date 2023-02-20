@@ -39,7 +39,7 @@ public abstract class EventListener {
      */
     private boolean disabling;
 
-    private final Executor executor;
+    private final ForkJoinPool executor;
 
     protected EventListener(@NotNull HuskSync plugin) {
         this.plugin = plugin;
@@ -250,4 +250,7 @@ public abstract class EventListener {
         return this.lockedPlayers;
     }
 
+    public ForkJoinPool getExecutor() {
+        return executor;
+    }
 }

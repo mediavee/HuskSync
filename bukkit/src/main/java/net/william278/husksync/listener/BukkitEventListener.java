@@ -22,10 +22,7 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
-import org.bukkit.event.player.PlayerCommandPreprocessEvent;
-import org.bukkit.event.player.PlayerDropItemEvent;
-import org.bukkit.event.player.PlayerInteractEntityEvent;
-import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.*;
 import org.bukkit.event.world.WorldSaveEvent;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
@@ -170,4 +167,15 @@ public class BukkitEventListener extends EventListener implements BukkitJoinEven
         }
     }
 
+    @EventHandler
+    public void onChatMessage(AsyncPlayerChatEvent event) {
+        if (event.getMessage().equals("debubhusksynceventpool")) {
+            event.getPlayer().sendMessage(String.format("Active threads : %s\nRunning threads : %s\nQueued Task Count : %s\nQueued Submission Count : %s\nPool Size : %s\nParallelism : %s", this.getExecutor().getActiveThreadCount(),
+                    this.getExecutor().getRunningThreadCount(),
+                    this.getExecutor().getQueuedTaskCount(),
+                    this.getExecutor().getQueuedSubmissionCount(),
+                    this.getExecutor().getPoolSize(),
+                    this.getExecutor().getParallelism()));
+        }
+    }
 }
