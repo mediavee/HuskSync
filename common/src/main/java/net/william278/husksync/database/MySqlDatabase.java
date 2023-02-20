@@ -3,10 +3,12 @@ package net.william278.husksync.database;
 import com.zaxxer.hikari.HikariDataSource;
 import net.william278.husksync.HuskSync;
 import net.william278.husksync.config.Settings;
-import net.william278.husksync.data.*;
+import net.william278.husksync.data.DataAdaptionException;
+import net.william278.husksync.data.DataSaveCause;
+import net.william278.husksync.data.UserData;
+import net.william278.husksync.data.UserDataSnapshot;
 import net.william278.husksync.event.DataSaveEvent;
 import net.william278.husksync.player.User;
-import net.william278.husksync.util.NamedThreadPoolFactory;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.ByteArrayInputStream;
@@ -15,7 +17,9 @@ import java.sql.*;
 import java.util.Date;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinWorkerThread;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
 public class MySqlDatabase extends Database {
@@ -51,7 +55,7 @@ public class MySqlDatabase extends Database {
      */
     private HikariDataSource connectionPool;
 
-    private final ExecutorService executor;
+    private final ForkJoinPool executor;
 
     public MySqlDatabase(@NotNull HuskSync plugin) {
         super(plugin);
@@ -68,7 +72,24 @@ public class MySqlDatabase extends Database {
         this.hikariKeepAliveTime = settings.mySqlConnectionPoolKeepAlive;
         this.hikariConnectionTimeOut = settings.mySqlConnectionPoolTimeout;
 
-        this.executor = NamedThreadPoolFactory.newThreadPool("HuskSync-MySQL", 6);
+        ForkJoinPool.ForkJoinWorkerThreadFactory factory = pool -> {
+            final ForkJoinWorkerThread worker = ForkJoinPool.defaultForkJoinWorkerThreadFactory.newThread(pool);
+            worker.setName("HuskSync-EventListener-" + worker.getPoolIndex());
+            return worker;
+        };
+
+        this.executor = new ForkJoinPool(
+                8,
+                factory,
+                null,
+                true,
+                0,
+                8,
+                0,
+                null,
+                60_000L,
+                TimeUnit.MILLISECONDS
+        );
     }
 
     /**
@@ -270,6 +291,36 @@ public class MySqlDatabase extends Database {
         }, executor);
     }
 
+    public List<UserDataSnapshot> getUserDataSync(@NotNull User user) {
+        final List<UserDataSnapshot> retrievedData = new ArrayList<>();
+        try (Connection connection = getConnection()) {
+            try (PreparedStatement statement = connection.prepareStatement(formatStatementTables("""
+                    SELECT `version_uuid`, `timestamp`, `save_cause`, `pinned`, `data`
+                    FROM `%user_data_table%`
+                    WHERE `player_uuid`=?
+                    ORDER BY `timestamp` DESC;"""))) {
+                statement.setString(1, user.uuid.toString());
+                final ResultSet resultSet = statement.executeQuery();
+                while (resultSet.next()) {
+                    final Blob blob = resultSet.getBlob("data");
+                    final byte[] dataByteArray = blob.getBytes(1, (int) blob.length());
+                    blob.free();
+                    final UserDataSnapshot data = new UserDataSnapshot(
+                            UUID.fromString(resultSet.getString("version_uuid")),
+                            Date.from(resultSet.getTimestamp("timestamp").toInstant()),
+                            DataSaveCause.getCauseByName(resultSet.getString("save_cause")),
+                            resultSet.getBoolean("pinned"),
+                            plugin.getDataAdapter().fromBytes(dataByteArray));
+                    retrievedData.add(data);
+                }
+                return retrievedData;
+            }
+        } catch (SQLException | DataAdaptionException e) {
+            plugin.log(Level.SEVERE, "Failed to fetch a user's current user data from the database", e);
+        }
+        return retrievedData;
+    }
+
     @Override
     public CompletableFuture<Optional<UserDataSnapshot>> getUserData(@NotNull User user, @NotNull UUID versionUuid) {
         return CompletableFuture.supplyAsync(() -> {
@@ -304,17 +355,17 @@ public class MySqlDatabase extends Database {
 
     @Override
     protected CompletableFuture<Void> rotateUserData(@NotNull User user) {
+        final List<UserDataSnapshot> unpinnedUserData = getUserDataSync(user).stream()
+                .filter(dataSnapshot -> !dataSnapshot.pinned()).toList();
         return CompletableFuture.runAsync(() -> {
-            final List<UserDataSnapshot> unpinnedUserData = getUserData(user).join().stream()
-                    .filter(dataSnapshot -> !dataSnapshot.pinned()).toList();
             if (unpinnedUserData.size() > plugin.getSettings().maxUserDataSnapshots) {
                 try (Connection connection = getConnection()) {
                     try (PreparedStatement statement = connection.prepareStatement(formatStatementTables("""
-                            DELETE FROM `%user_data_table%`
-                            WHERE `player_uuid`=?
-                            AND `pinned` IS FALSE
-                            ORDER BY `timestamp` ASC
-                            LIMIT %entry_count%;""".replace("%entry_count%",
+                    DELETE FROM `%user_data_table%`
+                    WHERE `player_uuid`=?
+                    AND `pinned` IS FALSE
+                    ORDER BY `timestamp` ASC
+                    LIMIT %entry_count%;""".replace("%entry_count%",
                             Integer.toString(unpinnedUserData.size() - plugin.getSettings().maxUserDataSnapshots))))) {
                         statement.setString(1, user.uuid.toString());
                         statement.executeUpdate();
@@ -346,8 +397,7 @@ public class MySqlDatabase extends Database {
     }
 
     @Override
-    public CompletableFuture<Void> setUserData(@NotNull User user, @NotNull UserData userData,
-                                               @NotNull DataSaveCause saveCause) {
+    public CompletableFuture<Void> setUserData(@NotNull User user, @NotNull UserData userData, @NotNull DataSaveCause saveCause) {
         return CompletableFuture.runAsync(() -> {
             final DataSaveEvent dataSaveEvent = (DataSaveEvent) plugin.getEventCannon().fireDataSaveEvent(user,
                     userData, saveCause).join();
@@ -368,7 +418,7 @@ public class MySqlDatabase extends Database {
                     plugin.log(Level.SEVERE, "Failed to set user data in the database", e);
                 }
             }
-        }, executor).thenRun(() -> rotateUserData(user).join());
+        }, executor).thenCompose(v -> rotateUserData(user));
     }
 
     @Override

@@ -39,7 +39,7 @@ public abstract class EventListener {
      */
     private boolean disabling;
 
-    private final Executor executor;
+    public static ForkJoinPool executor;
 
     protected EventListener(@NotNull HuskSync plugin) {
         this.plugin = plugin;
@@ -51,12 +51,17 @@ public abstract class EventListener {
             worker.setName("HuskSync-EventListener-" + worker.getPoolIndex());
             return worker;
         };
-
-        this.executor = new ForkJoinPool(
+        executor = new ForkJoinPool(
                 8,
                 factory,
                 null,
-                true
+                true,
+                0,
+                8,
+                0,
+                null,
+                60_000L,
+                TimeUnit.MILLISECONDS
         );
     }
 
@@ -169,10 +174,15 @@ public abstract class EventListener {
         // Handle asynchronous disconnection
         lockedPlayers.add(user.uuid);
         plugin.getRedisManager().setUserServerSwitch(user)
-                .thenRun(() -> user.getUserData(plugin).thenAccept(
-                        optionalUserData -> optionalUserData.ifPresent(userData -> plugin.getRedisManager()
-                                .setUserData(user, userData).thenRun(() -> plugin.getDatabase()
-                                        .setUserData(user, userData, DataSaveCause.DISCONNECT)))))
+                .thenRun(() -> {
+                    user.getUserData(plugin).thenAccept(userData -> {
+                        userData.ifPresent(userDataGetted -> {
+                            plugin.getRedisManager().setUserData(user, userDataGetted).thenRun(() -> {
+                                plugin.getDatabase().setUserData(user, userDataGetted, DataSaveCause.DISCONNECT);
+                            });
+                        });
+                    });
+                })
                 .exceptionally(throwable -> {
                     plugin.log(Level.SEVERE,
                             "An exception occurred handling a player disconnection");
@@ -250,4 +260,7 @@ public abstract class EventListener {
         return this.lockedPlayers;
     }
 
+    public ForkJoinPool getExecutor() {
+        return executor;
+    }
 }
