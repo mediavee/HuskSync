@@ -26,10 +26,13 @@ public class PersistentDataContainerData {
     protected PersistentDataContainerData() {
     }
 
-
     public <T> Optional<T> getTagValue(@NotNull final String tagName, @NotNull Class<T> tagClass) {
         if (persistentDataMap.containsKey(tagName)) {
-            return Optional.of(tagClass.cast(persistentDataMap.get(tagName).value));
+            Object value = persistentDataMap.get(tagName).value;
+            if (tagClass == Long.class && value instanceof Double) {
+                return Optional.of(tagClass.cast(((Double) value).longValue()));
+            }
+            return Optional.of(tagClass.cast(value));
         }
         return Optional.empty();
     }
